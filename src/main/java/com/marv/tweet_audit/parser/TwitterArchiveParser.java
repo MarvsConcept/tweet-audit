@@ -17,7 +17,12 @@ public class TwitterArchiveParser {
 
         try {
             String content = Files.readString(tweetFilePath);
-            System.out.println(content);
+
+            // remove the Javascript prefix so that only valid Json remains
+            String json = content.replace("window.YTD.tweets.part0 = ", "");
+
+            // print the json
+            System.out.println(json);
             return List.of();
         } catch (IOException e) {
             throw new RuntimeException("Failed to read tweets file", e);
