@@ -21,6 +21,7 @@ public class TwitterArchiveParser {
     public List<Tweet> parse(Path tweetFilePath) {
 
         try {
+            // reads the entire file into a String
             String content = Files.readString(tweetFilePath);
 
             // remove the Javascript prefix so that only valid Json remains
