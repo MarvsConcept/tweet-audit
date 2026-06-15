@@ -5,12 +5,14 @@ import com.marv.tweet_audit.model.AuditDecision;
 import com.marv.tweet_audit.model.Tweet;
 import com.marv.tweet_audit.url.TweetUrlBuilder;
 import com.marv.tweet_audit.writer.CsvReportWriter;
+import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 
 import java.nio.file.Path;
 import java.util.List;
 
 @RequiredArgsConstructor
+@Builder
 public class TweetAuditService {
 
     private final TweetUrlBuilder tweetUrlBuilder;

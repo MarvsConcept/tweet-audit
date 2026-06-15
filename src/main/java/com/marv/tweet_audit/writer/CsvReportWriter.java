@@ -10,6 +10,13 @@ public class CsvReportWriter {
     public void writeFlaggedTweet(Path outputPath, String tweetUrl) {
 
         try {
+            // Create the parent folder if it dosen't exist
+            Path parent = outputPath.getParent();
+
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+
             // Check if the CSV file already exists
             boolean fileExists = Files.exists(outputPath);
 
