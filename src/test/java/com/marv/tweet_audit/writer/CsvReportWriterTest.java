@@ -44,9 +44,10 @@ class CsvReportWriterTest {
 
         CsvReportWriter writer = new CsvReportWriter();
 
-        //
+        // Create a temporary report.csv file path
         Path outputPath = tempDir.resolve("report.csv");
 
+        // Calls the method to create the report.csv and write the flagged tweet into it.
         writer.writeFlaggedTweet(
                 outputPath,
                 "https://x.com/user/status/123"
@@ -56,8 +57,10 @@ class CsvReportWriterTest {
                 "https://x.com/user/status/456"
         );
 
+        // Reads the content of the file
         String content = Files.readString(outputPath);
 
+        // Checks that the content of the file matches the expected string
         assertThat(content).isEqualTo("tweet_url,deleted\n" +
                 "https://x.com/user/status/123,false\n" +
                 "https://x.com/user/status/456,false\n"
