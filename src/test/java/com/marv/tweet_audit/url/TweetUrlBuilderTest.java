@@ -8,6 +8,7 @@ class TweetUrlBuilderTest {
 
     @Test
     void shouldBuildTweetUrl() {
+
         TweetUrlBuilder builder = new TweetUrlBuilder();
 
         String url = builder.build("marvade", "1234567890");
