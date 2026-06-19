@@ -2,7 +2,9 @@ package com.marv.tweet_audit.audit;
 
 import com.marv.tweet_audit.model.AuditDecision;
 import com.marv.tweet_audit.model.Tweet;
+import org.springframework.stereotype.Component;
 
+@Component
 public class FakeTweetAuditClient implements TweetAuditClient{
 
     @Override

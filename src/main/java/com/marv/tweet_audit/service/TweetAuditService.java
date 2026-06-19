@@ -7,10 +7,12 @@ import com.marv.tweet_audit.url.TweetUrlBuilder;
 import com.marv.tweet_audit.writer.CsvReportWriter;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
 import java.util.List;
 
+@Service
 @RequiredArgsConstructor
 @Builder
 public class TweetAuditService {

@@ -1,10 +1,13 @@
 package com.marv.tweet_audit.writer;
 
+import org.springframework.stereotype.Component;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
+@Component
 public class CsvReportWriter {
 
     public void writeFlaggedTweet(Path outputPath, String tweetUrl) {

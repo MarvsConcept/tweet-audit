@@ -2,6 +2,7 @@ package com.marv.tweet_audit.parser;
 
 import com.marv.tweet_audit.model.Tweet;
 import com.marv.tweet_audit.model.TweetWrapper;
+import org.springframework.stereotype.Component;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
@@ -14,6 +15,7 @@ import java.util.List;
 // remove the JavaScript prefix and convert the remaining JSON to Java objects
 // Return List<Tweet>
 
+@Component
 public class TwitterArchiveParser {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
