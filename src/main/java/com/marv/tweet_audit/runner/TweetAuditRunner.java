@@ -8,15 +8,25 @@ import com.marv.tweet_audit.parser.TwitterArchiveParser;
 import com.marv.tweet_audit.service.TweetAuditService;
 import com.marv.tweet_audit.url.TweetUrlBuilder;
 import com.marv.tweet_audit.writer.CsvReportWriter;
+//import lombok.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.nio.file.Path;
 import java.util.List;
 
-
 @Component
 public class TweetAuditRunner implements CommandLineRunner {
+
+    @Value("${archive.tweets-path}")
+    private String tweetsPath;
+
+    @Value("${x.username}")
+    private String username;
+
+    @Value("${output.csv-path}")
+    private String outputPath;
 
     @Override
     public void run(String... args) {
@@ -33,12 +43,12 @@ public class TweetAuditRunner implements CommandLineRunner {
         );
 
         // calls the parser method and points to the tweet file
-        List<Tweet> tweets = parser.parse(Path.of("src/main/resources/sample/tweets.js"));
+        List<Tweet> tweets = parser.parse(Path.of(tweetsPath));
 
         service.audit(
                 tweets,
-                "marvade",
-                Path.of("output/flagged_tweets.csv")
+                username,
+                Path.of(outputPath)
         );
     }
 
