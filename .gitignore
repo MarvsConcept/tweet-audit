@@ -33,3 +33,21 @@ build/
 .vscode/
 
 /output
+
+
+# Secrets/local config
+.env
+application-local.properties
+src/main/resources/application-local.properties
+
+# X archive/private data
+archive/
+twitter-archive/
+data/
+*.zip
+
+# Generated output
+output/
+flagged_tweets.csv
+checkpoint.txt
+failed_tweets.csv
