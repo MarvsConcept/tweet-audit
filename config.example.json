@@ -1,0 +1,20 @@
+{
+  "archive": {
+    "tweetsPath": "path/to/twitter-archive/data/tweets.js"
+  },
+  "x": {
+    "username": "your_x_username"
+  },
+  "output": {
+    "csvPath": "output/flagged_tweets.csv"
+  },
+  "gemini": {
+    "apiKey": "set GEMINI_API_KEY in your environment"
+  },
+  "criteria": {
+    "forbiddenWords": ["crypto", "NFT", "hustlegrindset"],
+    "professionalCheck": true,
+    "tone": "respectful and thoughtful",
+    "excludePolitics": true
+  }
+}
