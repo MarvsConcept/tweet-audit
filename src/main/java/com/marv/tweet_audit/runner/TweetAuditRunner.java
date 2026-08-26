@@ -33,6 +33,9 @@ public class TweetAuditRunner implements CommandLineRunner {
     @Value("${output.csv-path}")
     private String outputPath;
 
+    @Value("${checkpoint.path}")
+    private String checkpointPath;
+
     @Override
     public void run(String... args) {
 
@@ -42,7 +45,8 @@ public class TweetAuditRunner implements CommandLineRunner {
         service.audit(
                 tweets,
                 username,
-                Path.of(outputPath)
+                Path.of(outputPath),
+                Path.of(checkpointPath) // tells the service where to save/read processed tweet IDs
         );
     }
 
