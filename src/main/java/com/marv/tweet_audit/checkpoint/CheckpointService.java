@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -35,5 +36,21 @@ public class CheckpointService {
     // After finishing a tweet, save its ID to checkpoint.txt.
     public void markProcessed(Path checkpointPath, String tweetId) {
 
+        try {
+
+            // makes sure the folder exists first
+            if (checkpointPath.getParent() != null) {
+                Files.createDirectories(checkpointPath.getParent());
+            }
+
+            Files.writeString(
+                    checkpointPath,
+                    tweetId + System.lineSeparator(),
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.APPEND
+            );
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to update checkpoint file", e);
+        }
     }
 }
