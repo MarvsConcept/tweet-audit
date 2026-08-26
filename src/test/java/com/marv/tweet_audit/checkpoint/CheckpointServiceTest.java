@@ -65,5 +65,29 @@ class CheckpointServiceTest {
         assertEquals(tweetId, lines.get(0));
     }
 
+    @Test
+    void shouldAppendProcessedTweetIds() throws IOException {
+
+        CheckpointService checkpointService = new CheckpointService();
+
+        // Arrange
+        Path checkpointPath = tempDir.resolve("checkpoint.txt");
+
+        String firstTweetId = "111";
+        String secondTweetId = "222";
+
+        // Act
+        checkpointService.markProcessed(checkpointPath, firstTweetId);
+        checkpointService.markProcessed(checkpointPath, secondTweetId);
+
+        //  Assert
+        List<String> lines = Files.readAllLines(checkpointPath);
+
+        assertEquals(2, lines.size());
+        assertEquals(firstTweetId, lines.get(0));
+        assertEquals(secondTweetId, lines.get(1));
+
+    }
+
 
 }
