@@ -1,6 +1,7 @@
 package com.marv.tweet_audit.service;
 
 import com.marv.tweet_audit.audit.TweetAuditClient;
+import com.marv.tweet_audit.checkpoint.CheckpointService;
 import com.marv.tweet_audit.model.AuditDecision;
 import com.marv.tweet_audit.model.Tweet;
 import com.marv.tweet_audit.url.TweetUrlBuilder;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -20,11 +22,20 @@ public class TweetAuditService {
     private final TweetUrlBuilder tweetUrlBuilder;
     private final CsvReportWriter csvReportWriter;
     private final TweetAuditClient tweetAuditClient;
+    private final CheckpointService checkpointService;
 
-    public void audit(List<Tweet> tweets, String username, Path outputPath) {
+    public void audit(List<Tweet> tweets, String username, Path outputPath, Path checkpointPath) {
+
+        Set<String> processedTweetIds =
+                checkpointService.loadProcessedTweetIds(checkpointPath);
 
         for (Tweet tweet : tweets) {
-            //
+
+            // Load the processed Id's before auditing the tweets
+            if (processedTweetIds.contains(tweet.id())) {
+                continue;
+            }
+
             AuditDecision decision = tweetAuditClient.audit(tweet);
 
             if (decision.flagged()) {
@@ -33,6 +44,9 @@ public class TweetAuditService {
                 // Writes the tweetLink into a Csv file.
                 csvReportWriter.writeFlaggedTweet(outputPath, tweetUrl);
             }
+
+            // mark each tweet after processing
+            checkpointService.markProcessed(checkpointPath, tweet.id());
         }
     }
 }
