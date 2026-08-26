@@ -1,6 +1,7 @@
 package com.marv.tweet_audit.service;
 
 import com.marv.tweet_audit.audit.TweetAuditClient;
+import com.marv.tweet_audit.checkpoint.CheckpointService;
 import com.marv.tweet_audit.model.AuditDecision;
 import com.marv.tweet_audit.model.Tweet;
 import com.marv.tweet_audit.url.TweetUrlBuilder;
@@ -13,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -29,7 +31,8 @@ class TweetAuditServiceTest {
     private CsvReportWriter csvReportWriter;
     @Mock
     private TweetAuditClient tweetAuditClient;
-
+    @Mock
+    private CheckpointService checkpointService;
 
     @Test
     void shouldOnlyWriteFlaggedTweetsToCsv() {
@@ -37,10 +40,13 @@ class TweetAuditServiceTest {
         TweetAuditService service = new TweetAuditService(
                 tweetUrlBuilder,
                 csvReportWriter,
-                tweetAuditClient);
+                tweetAuditClient,
+                checkpointService);
 
         // Create a temporary report.csv file path
         Path outputPath = tempDir.resolve("report.csv");
+
+        Path checkpointPath = tempDir.resolve("checkpoint.txt");
 
         // Create two fake tweets for the test and put them in a list so the service can audit them
         Tweet flaggedTweet = new Tweet("111", "hello", "date");
@@ -61,8 +67,13 @@ class TweetAuditServiceTest {
         when(tweetUrlBuilder.build("marv", "111"))
                 .thenReturn("https://x.com/marv/status/111");
 
+        // mock the checkpoint loading
+        when(checkpointService.loadProcessedTweetIds(checkpointPath))
+                .thenReturn(Set.of());
+
         // Call the service method being tested
-        service.audit(tweets, username, outputPath);
+        service.audit(tweets, username, outputPath, checkpointPath);
+
 
         // Verify that the CSV writer was called for the flagged tweet
         verify(csvReportWriter).writeFlaggedTweet(
@@ -75,5 +86,9 @@ class TweetAuditServiceTest {
                 outputPath,
                 "https://x.com/marv/status/222"
         );
+
+        // Verify that both processed tweets were marked
+        verify(checkpointService).markProcessed(checkpointPath, "111");
+        verify(checkpointService).markProcessed(checkpointPath, "222");
     }
 }
