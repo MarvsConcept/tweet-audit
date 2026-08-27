@@ -18,7 +18,12 @@ public class FakeTweetAuditClient implements TweetAuditClient{
 
         String text = tweet.text().toLowerCase();
 
-        if (text.contains("crypto") || text.contains("nft") || text.contains("hustle")) {
+        boolean containsForbiddenWord =
+                auditCriteria.getForbiddenWords()
+                        .stream()
+                        .anyMatch(word -> text.contains(word.toLowerCase()));
+
+        if (containsForbiddenWord) {
             return new AuditDecision(true, "Contains forbidden word");
         }
 
