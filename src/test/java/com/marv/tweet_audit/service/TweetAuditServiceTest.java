@@ -18,6 +18,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class TweetAuditServiceTest {
@@ -81,7 +82,7 @@ class TweetAuditServiceTest {
                 "https://x.com/marv/status/111"
         );
 
-        // Verify that the CSV writer was not called for the flagged tweet
+        // Verify that the CSV writer was not called for the safe tweet
         verify(csvReportWriter, never()).writeFlaggedTweet(
                 outputPath,
                 "https://x.com/marv/status/222"
@@ -89,6 +90,52 @@ class TweetAuditServiceTest {
 
         // Verify that both processed tweets were marked
         verify(checkpointService).markProcessed(checkpointPath, "111");
+        verify(checkpointService).markProcessed(checkpointPath, "222");
+    }
+
+    @Test
+    void shouldSkipAlreadyProcessedTweets() {
+        TweetAuditService service = new TweetAuditService(
+                tweetUrlBuilder,
+                csvReportWriter,
+                tweetAuditClient,
+                checkpointService
+        );
+
+        Path outputPath = tempDir.resolve("report.csv");
+        Path checkpointPath = tempDir.resolve("checkpoint.txt");
+
+        Tweet processedTweet = new Tweet("111", "hello", "date");
+        Tweet newTweet = new Tweet("222", "another tweet", "date");
+
+        List<Tweet> tweets = List.of(processedTweet, newTweet);
+        String username = "marv";
+
+        // Pretend tweet 111 was already processed in a previous run
+        when(checkpointService.loadProcessedTweetIds(checkpointPath))
+                .thenReturn(Set.of("111"));
+
+        // Tweet 222 should still be audited
+        when(tweetAuditClient.audit(newTweet))
+                .thenReturn(new AuditDecision(true, "Flagged for test"));
+
+        when(tweetUrlBuilder.build("marv", "222"))
+                .thenReturn("https://x.com/marv/status/222");
+
+        service.audit(tweets, username, outputPath, checkpointPath);
+
+        // Tweet 111 should be skipped completely
+        verify(tweetAuditClient, never()).audit(processedTweet);
+        verify(tweetUrlBuilder, never()).build("marv", "111");
+
+        // Tweet 222 should be processed normally
+        verify(tweetAuditClient).audit(newTweet);
+
+        verify(csvReportWriter).writeFlaggedTweet(
+                outputPath,
+                "https://x.com/marv/status/222"
+        );
+
         verify(checkpointService).markProcessed(checkpointPath, "222");
     }
 }
