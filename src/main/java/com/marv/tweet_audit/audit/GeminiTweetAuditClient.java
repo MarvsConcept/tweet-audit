@@ -1,11 +1,18 @@
 package com.marv.tweet_audit.audit;
 
 import com.marv.tweet_audit.config.GeminiProperties;
+import com.marv.tweet_audit.gemini.GeminiContent;
+import com.marv.tweet_audit.gemini.GeminiInteractionRequest;
+import com.marv.tweet_audit.gemini.GeminiInteractionResponse;
+import com.marv.tweet_audit.gemini.GeminiResponseFormat;
 import com.marv.tweet_audit.model.AuditCriteria;
 import com.marv.tweet_audit.model.AuditDecision;
 import com.marv.tweet_audit.model.Tweet;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -59,5 +66,69 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
 
         return new AuditDecision(false, "Gemini not connected yet");
 //        throw new UnsupportedOperationException("Gemini client not implemented yet");
+    }
+
+
+    private GeminiInteractionRequest buildRequest(Tweet tweet) {
+
+        // Build the actual instruction we want Gemini to follow
+        String prompt = buildPrompt(tweet);
+
+        // This schema tells Gemini the exact JSON shape we expect back
+        Map<String, Object> schema = Map.of(
+                "type", "object",
+                "properties", Map.of(
+                        "flagged", Map.of("type", "boolean"),
+                        "reason", Map.of("type", "string")
+                ),
+                "required", List.of("flagged", "reason")
+        );
+
+        // response_format asks Gemini to return JSON text matching the schema
+        GeminiResponseFormat responseFormat = new GeminiResponseFormat(
+                "text",
+                "application/json",
+                schema
+        );
+
+        // This is the full request body we will send to Gemini
+        return new GeminiInteractionRequest(
+                geminiProperties.getModel(),
+                prompt,
+                responseFormat
+        );
+    }
+
+
+    private String extractOutputText(GeminiInteractionResponse response) {
+        // Gemini may return a failed or empty response
+        if (response == null || response.steps() == null) {
+            throw new RuntimeException("Gemini returned an empty response");
+        }
+
+        return response.steps()
+                .stream()
+
+                // We only want the model's final visible output
+                .filter(step -> "model_output".equals(step.type()))
+
+                // Some steps may not have content
+                .filter(step -> step.content() != null)
+
+                // Flatten List<GeminiContent> from all model_output steps
+                .flatMap(step -> step.content().stream())
+
+                // We only want text content
+                .filter(content -> "text".equals(content.type()))
+
+                // Extract the actual text
+                .map(GeminiContent::text)
+
+                // Ignore null/blank text
+                .filter(text -> text != null && !text.isBlank())
+
+                // Take the first valid model output text
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("No text output found in Gemini response"));
     }
 }
