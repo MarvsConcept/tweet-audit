@@ -101,33 +101,29 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
 
 
     private String extractOutputText(GeminiInteractionResponse response) {
-        // Gemini may return a failed or empty response
-        if (response == null || response.steps() == null) {
+        // Defensive check in case Gemini returns no usable body
+        if (response == null) {
             throw new RuntimeException("Gemini returned an empty response");
+        }
+
+        // Prefer the simple convenience field if Gemini provides it
+        if (response.outputText() != null && !response.outputText().isBlank()) {
+            return response.outputText();
+        }
+
+        // Fall back to reading from steps if output_text is not present
+        if (response.steps() == null) {
+            throw new RuntimeException("No text output found in Gemini response");
         }
 
         return response.steps()
                 .stream()
-
-                // We only want the model's final visible output
                 .filter(step -> "model_output".equals(step.type()))
-
-                // Some steps may not have content
                 .filter(step -> step.content() != null)
-
-                // Flatten List<GeminiContent> from all model_output steps
                 .flatMap(step -> step.content().stream())
-
-                // We only want text content
                 .filter(content -> "text".equals(content.type()))
-
-                // Extract the actual text
                 .map(GeminiContent::text)
-
-                // Ignore null/blank text
                 .filter(text -> text != null && !text.isBlank())
-
-                // Take the first valid model output text
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("No text output found in Gemini response"));
     }
