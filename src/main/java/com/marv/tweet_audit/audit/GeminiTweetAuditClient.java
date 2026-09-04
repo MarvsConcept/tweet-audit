@@ -9,17 +9,24 @@ import com.marv.tweet_audit.model.AuditCriteria;
 import com.marv.tweet_audit.model.AuditDecision;
 import com.marv.tweet_audit.model.Tweet;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Map;
 
 @Component
+@Profile("gemini") // Use this client only when gemini profile is active
 @RequiredArgsConstructor
 public class GeminiTweetAuditClient implements TweetAuditClient{
 
     private final GeminiProperties geminiProperties;
     private final AuditCriteria auditCriteria;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final RestClient.Builder restClientBuilder;
 
     private String buildPrompt(Tweet tweet) {
         return """
@@ -50,23 +57,42 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
         );
     }
 
+
+
     @Override
     public AuditDecision audit(Tweet tweet) {
 
+        // Fail early if the API key was not provided
+        if (geminiProperties.getApiKey() == null || geminiProperties.getApiKey().isBlank()) {
+            throw new IllegalStateException("GEMINI_API_KEY is not set");
+        }
 
-        // 1. Build a Gemini prompt
-        // 2. Send the tweet + criteria to Gemini
-        // 3. Parse Gemini's response
-        // 4. Return AuditDecision
+        // Build the request body we will send to Gemini
+        GeminiInteractionRequest request = buildRequest(tweet);
 
-        String prompt = buildPrompt(tweet);
+        // Build RestClient from Spring Boot's configured builder
+        RestClient restClient = restClientBuilder.build();
 
-// Temporary: print prompt so we can inspect it before API call
-        System.out.println(prompt);
+        // Send the request to Gemini Interactions API
+        GeminiInteractionResponse response = restClient.post()
+                .uri(geminiProperties.getBaseUrl())
+                .header("x-goog-api-key", geminiProperties.getApiKey())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(request)
+                .retrieve()
+                .body(GeminiInteractionResponse.class);
 
-        return new AuditDecision(false, "Gemini not connected yet");
-//        throw new UnsupportedOperationException("Gemini client not implemented yet");
+        // Extract Gemini's JSON text response
+        String outputText = extractOutputText(response);
+
+        try {
+            // Convert Gemini's JSON text into our internal AuditDecision record
+            return objectMapper.readValue(outputText, AuditDecision.class);
+        } catch (RuntimeException e) {
+            throw new RuntimeException("Failed to parse Gemini audit response: " + outputText, e);
+        }
     }
+
 
 
     private GeminiInteractionRequest buildRequest(Tweet tweet) {

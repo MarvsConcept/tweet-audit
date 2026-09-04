@@ -4,10 +4,12 @@ import com.marv.tweet_audit.model.AuditCriteria;
 import com.marv.tweet_audit.model.AuditDecision;
 import com.marv.tweet_audit.model.Tweet;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 
-//@Component
+@Component
+@Profile("!gemini") // Use fake client unless the gemini profile is active
 @RequiredArgsConstructor
 public class FakeTweetAuditClient implements TweetAuditClient{
 
