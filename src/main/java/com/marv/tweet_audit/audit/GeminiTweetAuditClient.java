@@ -121,7 +121,8 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
         return new GeminiInteractionRequest(
                 geminiProperties.getModel(),
                 prompt,
-                responseFormat
+                responseFormat,
+                false // privacy: don't store personal tweet audit interaction
         );
     }
 

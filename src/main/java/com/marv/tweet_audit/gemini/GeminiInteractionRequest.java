@@ -12,7 +12,10 @@ public record GeminiInteractionRequest(
 
         // Tells Gemini we want JSON back
         @JsonProperty("response_format")
-        GeminiResponseFormat responseFormat
+        GeminiResponseFormat responseFormat,
+
+        // Do not store this interaction server-side
+        Boolean store
 
 ) {
 }
