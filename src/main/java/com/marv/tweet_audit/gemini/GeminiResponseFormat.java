@@ -6,6 +6,7 @@ import java.util.Map;
 
 public record GeminiResponseFormat(
 
+        // "text" because we want Gemini to return text
         String type,
 
         // Want the text to be valid JSON
