@@ -35,6 +35,11 @@ class TweetAuditServiceTest {
     @Mock
     private CheckpointService checkpointService;
 
+    private final List<Tweet> tweets = List.of(
+            new Tweet("111", "hello", "date"),
+            new Tweet("222", "another tweet", "date")
+    );
+
     @Test
     void shouldOnlyWriteFlaggedTweetsToCsv() {
 
@@ -138,4 +143,47 @@ class TweetAuditServiceTest {
 
         verify(checkpointService).markProcessed(checkpointPath, "222");
     }
+
+    @Test
+    void shouldContinueAuditingWhenOneTweetFails() {
+        TweetAuditService service = new TweetAuditService(
+                tweetUrlBuilder,
+                csvReportWriter,
+                tweetAuditClient,
+                checkpointService
+        );
+
+        Path outputPath = tempDir.resolve("report.csv");
+        Path checkpointPath = tempDir.resolve("checkpoint.txt");
+
+        // No tweets have been processed before
+        when(checkpointService.loadProcessedTweetIds(checkpointPath))
+                .thenReturn(Set.of());
+
+        // First tweet fails during audit
+        when(tweetAuditClient.audit(tweets.get(0)))
+                .thenThrow(new RuntimeException("Gemini failed"));
+
+        // Second tweet succeeds and is flagged
+        when(tweetAuditClient.audit(tweets.get(1)))
+                .thenReturn(new AuditDecision(true, "Flagged for test"));
+
+        when(tweetUrlBuilder.build("marv", "222"))
+                .thenReturn("https://x.com/marv/status/222");
+
+        // Run the audit
+        service.audit(tweets, username, outputPath, checkpointPath);
+
+        // Failed tweet should not be marked as processed
+        verify(checkpointService, never()).markProcessed(checkpointPath, "111");
+
+        // Successful tweet should still be processed
+        verify(tweetAuditClient).audit(tweets.get(1));
+        verify(csvReportWriter).writeFlaggedTweet(
+                outputPath,
+                "https://x.com/marv/status/222"
+        );
+        verify(checkpointService).markProcessed(checkpointPath, "222");
+    }
+
 }
