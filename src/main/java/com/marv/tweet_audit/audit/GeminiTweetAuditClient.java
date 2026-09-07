@@ -13,6 +13,8 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
@@ -107,6 +109,11 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
                 return sendRequest(request);
 
             } catch (Exception e) {
+                // Retry only temporary failures like 429 or 5xx
+                if (!isRetryable(e)) {
+                    throw new RuntimeException("Gemini request failed with non-retryable error", e);
+                }
+
                 // If this is the last attempt, give up
                 if (attempt == MAX_ATTEMPTS) {
                     throw new RuntimeException("Gemini request failed after " + MAX_ATTEMPTS + " attempts", e);
@@ -119,12 +126,25 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
                     Thread.currentThread().interrupt();
                     throw new RuntimeException("Retry interrupted", interruptedException);
                 }
-
                 // Increase delay for next retry: 1s, then 2s, then 4s....
                 delayMS *=2;
             }
         }
         throw new RuntimeException("Gemini request failed unexpectedly");
+    }
+
+    private boolean isRetryable(Exception e) {
+        // RestClientResponseException contains the HTTP status code from Gemini
+        if (e instanceof RestClientResponseException responseException) {
+            int statusCode = responseException.getStatusCode().value();
+
+            // 429 = rate limited
+            // 5xx = temporary server-side failure
+            return statusCode == 429 || statusCode >= 500;
+        }
+
+        // Network/client-level RestClient errors can be temporary
+        return e instanceof RestClientException;
     }
 
     private GeminiInteractionRequest buildRequest(Tweet tweet) {
