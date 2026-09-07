@@ -28,6 +28,9 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestClient.Builder restClientBuilder;
 
+    private static final int MAX_ATTEMPTS = 3;
+    private static final long INITIAL_DELAY_MS = 1000;
+
     private String buildPrompt(Tweet tweet) {
         return """
             You are auditing old tweets for alignment with the user's current values.
@@ -57,8 +60,6 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
         );
     }
 
-
-
     @Override
     public AuditDecision audit(Tweet tweet) {
 
@@ -70,8 +71,7 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
         // Build the request body we will send to Gemini
         GeminiInteractionRequest request = buildRequest(tweet);
 
-
-        GeminiInteractionResponse response = sendRequest(request);
+        GeminiInteractionResponse response = sendRequestWithRetry(request);
 
         // Extract Gemini's JSON text response
         String outputText = extractOutputText(response);
@@ -96,6 +96,35 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
                 .body(request)
                 .retrieve()
                 .body(GeminiInteractionResponse.class);
+    }
+
+    private GeminiInteractionResponse sendRequestWithRetry(GeminiInteractionRequest request) {
+        long delayMS = INITIAL_DELAY_MS;
+
+        for (int attempt = 1; attempt < MAX_ATTEMPTS; attempt++) {
+            try {
+                // Try to call Gemini
+                return sendRequest(request);
+
+            } catch (Exception e) {
+                // If this is the last attempt, give up
+                if (attempt == MAX_ATTEMPTS) {
+                    throw new RuntimeException("Gemini request failed after " + MAX_ATTEMPTS + " attempts", e);
+                }
+
+                // Wait before trying again
+                try {
+                    Thread.sleep(delayMS);
+                } catch (InterruptedException interruptedException) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Retry interrupted", interruptedException);
+                }
+
+                // Increase delay for next retry: 1s, then 2s, then 4s....
+                delayMS *=2;
+            }
+        }
+        throw new RuntimeException("Gemini request failed unexpectedly");
     }
 
     private GeminiInteractionRequest buildRequest(Tweet tweet) {
