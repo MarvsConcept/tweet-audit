@@ -87,6 +87,9 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
     }
 
     private GeminiInteractionResponse sendRequest(GeminiInteractionRequest request) {
+        // Slow down Gemini calls to reduce rate-limit errors
+        applyRateLimit();
+
         // Build RestClient from Spring Boot's configured builder
         RestClient restClient = restClientBuilder.build();
 
@@ -145,6 +148,21 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
 
         // Network/client-level RestClient errors can be temporary
         return e instanceof RestClientException;
+    }
+
+    private void applyRateLimit() {
+        // If delay is 0 or negative, rate limiting is disabled
+        if (geminiProperties.getRequestDelaysMs() <= 0) {
+            return;
+        }
+
+        try {
+            // Pause before sending the next Gemini request
+            Thread.sleep(geminiProperties.getRequestDelaysMs());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Rate limit sleep interrupted", e);
+        }
     }
 
     private GeminiInteractionRequest buildRequest(Tweet tweet) {

@@ -16,4 +16,6 @@ public class GeminiProperties{
     private String model;
 
     private String baseUrl;
+
+    private long requestDelaysMs;
 }
