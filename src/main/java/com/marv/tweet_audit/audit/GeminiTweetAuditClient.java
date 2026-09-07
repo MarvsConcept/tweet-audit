@@ -70,17 +70,8 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
         // Build the request body we will send to Gemini
         GeminiInteractionRequest request = buildRequest(tweet);
 
-        // Build RestClient from Spring Boot's configured builder
-        RestClient restClient = restClientBuilder.build();
 
-        // Send the request to Gemini Interactions API
-        GeminiInteractionResponse response = restClient.post()
-                .uri(geminiProperties.getBaseUrl())
-                .header("x-goog-api-key", geminiProperties.getApiKey())
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(request)
-                .retrieve()
-                .body(GeminiInteractionResponse.class);
+        GeminiInteractionResponse response = sendRequest(request);
 
         // Extract Gemini's JSON text response
         String outputText = extractOutputText(response);
@@ -93,7 +84,19 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
         }
     }
 
+    private GeminiInteractionResponse sendRequest(GeminiInteractionRequest request) {
+        // Build RestClient from Spring Boot's configured builder
+        RestClient restClient = restClientBuilder.build();
 
+        // Send POST request to Gemini Interaction API
+        return restClient.post()
+                .uri(geminiProperties.getBaseUrl())
+                .header("x-goog-api-key", geminiProperties.getApiKey())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(request)
+                .retrieve()
+                .body(GeminiInteractionResponse.class);
+    }
 
     private GeminiInteractionRequest buildRequest(Tweet tweet) {
 
