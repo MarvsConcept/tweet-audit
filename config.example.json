@@ -8,8 +8,17 @@
   "output": {
     "csvPath": "output/flagged_tweets.csv"
   },
+  "checkpoint": {
+    "path": "output/checkpoint.txt"
+  },
+  "failedTweets": {
+    "path": "output/failed_tweets.txt"
+  },
   "gemini": {
-    "apiKey": "set GEMINI_API_KEY in your environment"
+    "apiKey": "set GEMINI_API_KEY in your environment",
+    "model": "your_gemini_model",
+    "baseUrl": "https://generativelanguage.googleapis.com/v1beta/interactions",
+    "requestDelayMs": 1000
   },
   "criteria": {
     "forbiddenWords": ["crypto", "NFT", "hustlegrindset"],
