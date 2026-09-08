@@ -32,4 +32,21 @@ class FailedTweetWriterTest {
                 .isEqualTo("111" + System.lineSeparator());
     }
 
+    @Test
+    void shouldNotWriteDuplicateFailedTweetIds() throws Exception {
+        FailedTweetWriter writer = new FailedTweetWriter();
+
+        Path failedTweetsPath = tempDir.resolve("failed_tweets.txt");
+
+        // Same tweet fails twice
+        writer.writeFailedTweet(failedTweetsPath, "111");
+        writer.writeFailedTweet(failedTweetsPath, "111");
+
+        String content = Files.readString(failedTweetsPath);
+
+        // ID should appear only once
+        assertThat(content)
+                .isEqualTo("111" + System.lineSeparator());
+    }
+
 }
