@@ -55,6 +55,23 @@ public class TweetAuditService {
                 // mark each tweet after processing
                 checkpointService.markProcessed(checkpointPath, tweet.id());
 
+                // If this tweet failed on an earlier run but it succeeded now,
+                // remove it from the unresolved failure list.
+                try {
+                    failedTweetWriter.removeFailedTweet(
+                            failedTweetsPath,
+                            tweet.id()
+                    );
+                } catch (Exception e) {
+                    // The audit succeeded, so don't classify the tweet as failed again.
+                    // This is only a cleanup problm.
+                    log.warn(
+                            "Tweet {} was successfully audited, but its old failure record could not be removed",
+                            tweet.id(),
+                            e
+                    );
+                }
+
             } catch (Exception e) {
 
                 // Don't stop the whole archive because one tweet failed
