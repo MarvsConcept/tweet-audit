@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -42,6 +43,33 @@ public class FailedTweetWriter {
             );
         } catch (IOException e) {
             throw new RuntimeException("Failed to write failed tweet", e);
+        }
+    }
+
+    public void removeFailedTweet(Path path, String tweetId) {
+
+        try {
+            // Nothing to remove if the failure file dosen't exist
+            if (Files.notExists(path)) {
+                return;
+            }
+
+            // Keep every failed ID except the one that has now succeeded
+            List<String> remainingIds = Files.readAllLines(path)
+                    .stream()
+                    .filter(line -> !line.isBlank())
+                    .filter(line -> !line.equals(tweetId))
+                    .toList();
+
+            // Rewrite the file with only unresolved failures
+            Files.write(
+                    path,
+                    remainingIds,
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE
+            );
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to remove resolved tweet", e);
         }
     }
 }
