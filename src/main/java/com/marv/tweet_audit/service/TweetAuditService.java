@@ -6,6 +6,7 @@ import com.marv.tweet_audit.model.AuditDecision;
 import com.marv.tweet_audit.model.Tweet;
 import com.marv.tweet_audit.url.TweetUrlBuilder;
 import com.marv.tweet_audit.writer.CsvReportWriter;
+import com.marv.tweet_audit.writer.FailedTweetWriter;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +26,7 @@ public class TweetAuditService {
     private final CsvReportWriter csvReportWriter;
     private final TweetAuditClient tweetAuditClient;
     private final CheckpointService checkpointService;
+    private final FailedTweetWriter failedTweetWriter;
 
     public void audit(List<Tweet> tweets, String username, Path outputPath, Path checkpointPath) {
 
@@ -57,6 +59,11 @@ public class TweetAuditService {
 
                 // Don't stop the whole archive because one tweet failed
                 log.error("Failed to audit tweet with id: {}", tweet.id(), e);
+
+                failedTweetWriter.writeFailedTweet(
+                        checkpointPath.getParent().resolve("failed_tweets.txt"),
+                        tweet.id()
+                );
             }
         }
 
