@@ -49,4 +49,21 @@ class FailedTweetWriterTest {
                 .isEqualTo("111" + System.lineSeparator());
     }
 
+    @Test
+    void shouldRemoveFailedTweetAfterSuccessfulRetry() throws Exception {
+        FailedTweetWriter writer = new FailedTweetWriter();
+
+        Path path = tempDir.resolve("failed_tweets.txt");
+
+        writer.writeFailedTweet(path, "111");
+        writer.writeFailedTweet(path, "222");
+
+        // Tweet 111 later succeeds
+        writer.removeFailedTweet(path, "111");
+
+        String content = Files.readString(path);
+
+        assertThat(content)
+                .isEqualTo("222" + System.lineSeparator());
+    }
 }
