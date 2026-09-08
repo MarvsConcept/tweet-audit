@@ -43,6 +43,8 @@ class TweetAuditServiceTest {
             new Tweet("222", "another tweet", "date")
     );
 
+    String username = "marv";
+
     @Test
     void shouldOnlyWriteFlaggedTweetsToCsv() {
 
@@ -65,9 +67,6 @@ class TweetAuditServiceTest {
         Tweet safeTweet = new Tweet("222", "another tweet", "date");
 
         List<Tweet> tweets = List.of(flaggedTweet, safeTweet);
-
-        // username used to build the tweet URLs
-        String username = "marv";
 
         // Tells the mock audit that the first tweet is flagged and the second is safe
         when(tweetAuditClient.audit(flaggedTweet))
@@ -122,7 +121,6 @@ class TweetAuditServiceTest {
         Tweet newTweet = new Tweet("222", "another tweet", "date");
 
         List<Tweet> tweets = List.of(processedTweet, newTweet);
-        String username = "marv";
 
         // Pretend tweet 111 was already processed in a previous run
         when(checkpointService.loadProcessedTweetIds(checkpointPath))
@@ -167,7 +165,6 @@ class TweetAuditServiceTest {
         Path checkpointPath = tempDir.resolve("checkpoint.txt");
         Path failedTweetsPath = tempDir.resolve("failed_tweets.txt");
 
-        String username = "marv";
 
         // No tweets have been processed before
         when(checkpointService.loadProcessedTweetIds(checkpointPath))
@@ -203,6 +200,45 @@ class TweetAuditServiceTest {
                 "https://x.com/marv/status/222"
         );
         verify(checkpointService).markProcessed(checkpointPath, "222");
+    }
+
+    @Test
+    void shouldRemoveFailedTweetRecordAfterSuccessfulRetry() {
+        TweetAuditService service = new TweetAuditService(
+                tweetUrlBuilder,
+                csvReportWriter,
+                tweetAuditClient,
+                checkpointService,
+                failedTweetWriter
+        );
+
+        Path outputPath = tempDir.resolve("report.csv");
+        Path checkpointPath = tempDir.resolve("checkpoint.txt");
+        Path failedTweetsPath = tempDir.resolve("failed_tweets.txt");
+
+        // No tweets are checkpointed yet, so tweet 111 should be retried
+        when(checkpointService.loadProcessedTweetIds(checkpointPath))
+                .thenReturn(Set.of());
+
+        // This time the previously failed tweet succeeds
+        when(tweetAuditClient.audit(tweets.get(0)))
+                .thenReturn(new AuditDecision(false, "Tweet is aligned"));
+
+        service.audit(
+                List.of(tweets.get(0)),
+                username,
+                outputPath,
+                checkpointPath,
+                failedTweetsPath
+        );
+
+        // Successful audit should be checkpointed
+        verify(checkpointService)
+                .markProcessed(checkpointPath, "111");
+
+        // Old failure record should be cleaned up
+        verify(failedTweetWriter)
+                .removeFailedTweet(failedTweetsPath, "111");
     }
 
 }
