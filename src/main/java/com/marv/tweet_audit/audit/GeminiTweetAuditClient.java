@@ -1,14 +1,12 @@
 package com.marv.tweet_audit.audit;
 
 import com.marv.tweet_audit.config.GeminiProperties;
-import com.marv.tweet_audit.gemini.GeminiContent;
-import com.marv.tweet_audit.gemini.GeminiInteractionRequest;
-import com.marv.tweet_audit.gemini.GeminiInteractionResponse;
-import com.marv.tweet_audit.gemini.GeminiResponseFormat;
+import com.marv.tweet_audit.gemini.*;
 import com.marv.tweet_audit.model.AuditCriteria;
 import com.marv.tweet_audit.model.AuditDecision;
 import com.marv.tweet_audit.model.Tweet;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -20,6 +18,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Component
 @Profile("gemini") // Use this client only when gemini profile is active
 @RequiredArgsConstructor
@@ -113,14 +112,40 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
                 return sendRequest(request);
 
             } catch (Exception e) {
+
+                // If Gemini returned an HTTP error, inspect its specific error code
+                if (e instanceof RestClientResponseException responseException) {
+                    GeminiError geminiError = extractGeminiError(responseException);
+
+                    if (geminiError != null) {
+                        if ("quota_exceeded".equals(geminiError.code())) {
+                            // No point retrying when daily quota is exhausted
+                            log.error(
+                                    "Gemini daily quota exhausted: {}",
+                                    geminiError.message()
+                            );
+                        } else if (isRetryable(e)) {
+                            // Temporary error, so tell us another attempt is coming
+                            log.warn(
+                                    "Gemini request failed with '{}'. Retrying attempt {}/{}...",
+                                    geminiError.code(),
+                                    attempt + 1,
+                                    MAX_ATTEMPTS
+                            );
+                        }
+                    }
+                }
+
                 // Retry only temporary failures like 429 or 5xx
                 if (!isRetryable(e)) {
-                    throw new RuntimeException("Gemini request failed with non-retryable error", e);
+                    throw new RuntimeException(
+                            "Gemini request failed with non-retryable error", e);
                 }
 
                 // If this is the last attempt, give up
                 if (attempt == MAX_ATTEMPTS) {
-                    throw new RuntimeException("Gemini request failed after " + MAX_ATTEMPTS + " attempts", e);
+                    throw new RuntimeException(
+                            "Gemini request failed after " + MAX_ATTEMPTS + " attempts", e);
                 }
 
                 // Wait before trying again
@@ -130,7 +155,7 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
                     Thread.currentThread().interrupt();
                     throw new RuntimeException("Retry interrupted", interruptedException);
                 }
-                // Increase delay for next retry: 1s, then 2s, then 4s....
+                // Exponential Backoff: Increase delay for next retry: 1s, then 2s, then 4s....
                 delayMS *=2;
             }
         }
@@ -140,11 +165,35 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
     private boolean isRetryable(Exception e) {
         // RestClientResponseException contains the HTTP status code from Gemini
         if (e instanceof RestClientResponseException responseException) {
-            int statusCode = responseException.getStatusCode().value();
 
-            // 429 = rate limited
-            // 5xx = temporary server-side failure
-            return statusCode == 429 || statusCode >= 500;
+
+            GeminiError geminiError = extractGeminiError(responseException);
+
+            if (geminiError != null) {
+
+                return switch (geminiError.code()) {
+                    // Temporary rate limits
+                    case "rate_limit_exceeded",
+                         "too_many_requests" -> true;
+
+                    // Temporary Gemini/server failures
+                    case "api_error",
+                         "service_unavailable" -> true;
+
+                    // Daily quota is exhausted — retrying immediately won't help
+                    case "quota_exceeded" -> false;
+
+                    default -> false;
+                };
+            }
+            /// Fallback if Gemini returned an unexpected/unparseable error body
+            int status = responseException.getStatusCode().value();
+
+            return status == 429 ||
+                    status == 500 ||
+                    status == 502 ||
+                    status == 503 ||
+                    status == 504;
         }
 
         // Network/client-level RestClient errors can be temporary
@@ -163,6 +212,22 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Rate limit sleep interrupted", e);
+        }
+    }
+
+    private GeminiError extractGeminiError(RestClientResponseException exception) {
+        try {
+            // Convert Gemini's JSON error body into our error DTO
+            GeminiErrorResponse response = objectMapper.readValue(
+                    exception.getResponseBodyAsString(),
+                    GeminiErrorResponse.class
+            );
+
+            return response.error();
+
+        } catch (Exception e) {
+            // We still have the HTTP status even if the error body cannot be parsed
+            return null;
         }
     }
 
