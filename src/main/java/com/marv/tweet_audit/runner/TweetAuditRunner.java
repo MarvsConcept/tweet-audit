@@ -45,6 +45,11 @@ public class TweetAuditRunner implements CommandLineRunner {
         // calls the parser method and points to the tweet file
         List<Tweet> tweets = parser.parse(Path.of(tweetsPath));
 
+        // Temporary smoke test: process only the first 5 tweets
+        List<Tweet> sampleTweets = tweets.stream()
+                .limit(10)
+                .toList();
+
         service.audit(
                 tweets,
                 username,

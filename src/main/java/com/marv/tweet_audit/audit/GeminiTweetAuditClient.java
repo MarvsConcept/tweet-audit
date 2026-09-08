@@ -103,10 +103,11 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
                 .body(GeminiInteractionResponse.class);
     }
 
-    private GeminiInteractionResponse sendRequestWithRetry(GeminiInteractionRequest request) {
+    private GeminiInteractionResponse sendRequestWithRetry(
+            GeminiInteractionRequest request) {
         long delayMS = INITIAL_DELAY_MS;
 
-        for (int attempt = 1; attempt < MAX_ATTEMPTS; attempt++) {
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
                 // Try to call Gemini
                 return sendRequest(request);
