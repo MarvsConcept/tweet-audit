@@ -28,7 +28,7 @@ public class TweetAuditService {
     private final CheckpointService checkpointService;
     private final FailedTweetWriter failedTweetWriter;
 
-    public void audit(List<Tweet> tweets, String username, Path outputPath, Path checkpointPath) {
+    public void audit(List<Tweet> tweets, String username, Path outputPath, Path checkpointPath, Path failedTweetsPath) {
 
         // Load tweet IDs that were already processed in previous runs
         Set<String> processedTweetIds =
@@ -61,7 +61,7 @@ public class TweetAuditService {
                 log.error("Failed to audit tweet with id: {}", tweet.id(), e);
 
                 failedTweetWriter.writeFailedTweet(
-                        checkpointPath.getParent().resolve("failed_tweets.txt"),
+                       failedTweetsPath,
                         tweet.id()
                 );
             }
