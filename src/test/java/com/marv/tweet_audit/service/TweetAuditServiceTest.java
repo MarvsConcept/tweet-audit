@@ -6,6 +6,7 @@ import com.marv.tweet_audit.model.AuditDecision;
 import com.marv.tweet_audit.model.Tweet;
 import com.marv.tweet_audit.url.TweetUrlBuilder;
 import com.marv.tweet_audit.writer.CsvReportWriter;
+import com.marv.tweet_audit.writer.FailedTweetWriter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
@@ -34,6 +35,8 @@ class TweetAuditServiceTest {
     private TweetAuditClient tweetAuditClient;
     @Mock
     private CheckpointService checkpointService;
+    @Mock
+    private FailedTweetWriter failedTweetWriter;
 
     private final List<Tweet> tweets = List.of(
             new Tweet("111", "hello", "date"),
@@ -47,12 +50,15 @@ class TweetAuditServiceTest {
                 tweetUrlBuilder,
                 csvReportWriter,
                 tweetAuditClient,
-                checkpointService);
+                checkpointService,
+                failedTweetWriter);
 
         // Create a temporary report.csv file path
         Path outputPath = tempDir.resolve("report.csv");
 
         Path checkpointPath = tempDir.resolve("checkpoint.txt");
+
+        Path failedTweetsPath = tempDir.resolve("failed_tweets.txt");
 
         // Create two fake tweets for the test and put them in a list so the service can audit them
         Tweet flaggedTweet = new Tweet("111", "hello", "date");
@@ -78,7 +84,7 @@ class TweetAuditServiceTest {
                 .thenReturn(Set.of());
 
         // Call the service method being tested
-        service.audit(tweets, username, outputPath, checkpointPath);
+        service.audit(tweets, username, outputPath, checkpointPath, failedTweetsPath);
 
 
         // Verify that the CSV writer was called for the flagged tweet
@@ -104,11 +110,13 @@ class TweetAuditServiceTest {
                 tweetUrlBuilder,
                 csvReportWriter,
                 tweetAuditClient,
-                checkpointService
+                checkpointService,
+                failedTweetWriter
         );
 
         Path outputPath = tempDir.resolve("report.csv");
         Path checkpointPath = tempDir.resolve("checkpoint.txt");
+        Path failedTweetsPath = tempDir.resolve("failed_tweets.txt");
 
         Tweet processedTweet = new Tweet("111", "hello", "date");
         Tweet newTweet = new Tweet("222", "another tweet", "date");
@@ -127,7 +135,7 @@ class TweetAuditServiceTest {
         when(tweetUrlBuilder.build("marv", "222"))
                 .thenReturn("https://x.com/marv/status/222");
 
-        service.audit(tweets, username, outputPath, checkpointPath);
+        service.audit(tweets, username, outputPath, checkpointPath, failedTweetsPath);
 
         // Tweet 111 should be skipped completely
         verify(tweetAuditClient, never()).audit(processedTweet);
@@ -150,11 +158,16 @@ class TweetAuditServiceTest {
                 tweetUrlBuilder,
                 csvReportWriter,
                 tweetAuditClient,
-                checkpointService
+                checkpointService,
+                failedTweetWriter
+
         );
 
         Path outputPath = tempDir.resolve("report.csv");
         Path checkpointPath = tempDir.resolve("checkpoint.txt");
+        Path failedTweetsPath = tempDir.resolve("failed_tweets.txt");
+
+        String username = "marv";
 
         // No tweets have been processed before
         when(checkpointService.loadProcessedTweetIds(checkpointPath))
@@ -172,7 +185,13 @@ class TweetAuditServiceTest {
                 .thenReturn("https://x.com/marv/status/222");
 
         // Run the audit
-        service.audit(tweets, username, outputPath, checkpointPath);
+        service.audit(tweets, username, outputPath, checkpointPath, failedTweetsPath);
+
+        // Tweet 111 failed, so it should be written to the failed-tweets file
+        verify(failedTweetWriter).writeFailedTweet(
+                failedTweetsPath,
+                "111"
+        );
 
         // Failed tweet should not be marked as processed
         verify(checkpointService, never()).markProcessed(checkpointPath, "111");
