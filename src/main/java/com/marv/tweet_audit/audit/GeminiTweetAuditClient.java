@@ -104,61 +104,88 @@ public class GeminiTweetAuditClient implements TweetAuditClient{
 
     private GeminiInteractionResponse sendRequestWithRetry(
             GeminiInteractionRequest request) {
-        long delayMS = INITIAL_DELAY_MS;
+
+        long delayMs = INITIAL_DELAY_MS;
 
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+
             try {
-                // Try to call Gemini
                 return sendRequest(request);
 
             } catch (Exception e) {
 
-                // If Gemini returned an HTTP error, inspect its specific error code
-                if (e instanceof RestClientResponseException responseException) {
-                    GeminiError geminiError = extractGeminiError(responseException);
+                GeminiError geminiError = null;
 
-                    if (geminiError != null) {
-                        if ("quota_exceeded".equals(geminiError.code())) {
-                            // No point retrying when daily quota is exhausted
-                            log.error(
-                                    "Gemini daily quota exhausted: {}",
-                                    geminiError.message()
-                            );
-                        } else if (isRetryable(e)) {
-                            // Temporary error, so tell us another attempt is coming
-                            log.warn(
-                                    "Gemini request failed with '{}'. Retrying attempt {}/{}...",
-                                    geminiError.code(),
-                                    attempt + 1,
-                                    MAX_ATTEMPTS
-                            );
-                        }
-                    }
+                // Try to read Gemini's specific error code
+                if (e instanceof RestClientResponseException responseException) {
+                    geminiError = extractGeminiError(responseException);
                 }
 
-                // Retry only temporary failures like 429 or 5xx
+                // Daily quota exhausted — retrying now is pointless
+                if (geminiError != null
+                        && "quota_exceeded".equals(geminiError.code())) {
+
+                    throw new RuntimeException(
+                            "Gemini daily quota exhausted: " + geminiError.message(),
+                            e
+                    );
+                }
+
+                // Stop immediately for errors that should not be retried
                 if (!isRetryable(e)) {
                     throw new RuntimeException(
-                            "Gemini request failed with non-retryable error", e);
+                            "Gemini request failed with non-retryable error",
+                            e
+                    );
                 }
 
-                // If this is the last attempt, give up
+                // We've already used the final attempt
                 if (attempt == MAX_ATTEMPTS) {
                     throw new RuntimeException(
-                            "Gemini request failed after " + MAX_ATTEMPTS + " attempts", e);
+                            "Gemini request failed after "
+                                    + MAX_ATTEMPTS + " attempts",
+                            e
+                    );
                 }
 
-                // Wait before trying again
+                // 429 short-term rate limit needs a longer cooldown
+                if (geminiError != null
+                        && ("too_many_requests".equals(geminiError.code())
+                        || "rate_limit_exceeded".equals(geminiError.code()))) {
+
+                    delayMs = 30_000; // 30 seconds
+                }
+
+                String errorCode =
+                        geminiError != null
+                                ? geminiError.code()
+                                : e.getClass().getSimpleName();
+
+                // Only log a retry when another attempt will actually happen
+                log.warn(
+                        "Gemini request failed with '{}'. Retrying attempt {}/{} in {} ms...",
+                        errorCode,
+                        attempt + 1,
+                        MAX_ATTEMPTS,
+                        delayMs
+                );
+
                 try {
-                    Thread.sleep(delayMS);
+                    Thread.sleep(delayMs);
                 } catch (InterruptedException interruptedException) {
                     Thread.currentThread().interrupt();
-                    throw new RuntimeException("Retry interrupted", interruptedException);
+
+                    throw new RuntimeException(
+                            "Gemini retry interrupted",
+                            interruptedException
+                    );
                 }
-                // Exponential Backoff: Increase delay for next retry: 1s, then 2s, then 4s....
-                delayMS *=2;
+
+                // Exponential backoff for the next retry
+                delayMs *= 2;
             }
         }
+
         throw new RuntimeException("Gemini request failed unexpectedly");
     }
 
